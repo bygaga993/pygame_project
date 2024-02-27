@@ -1,6 +1,8 @@
 import pygame
 import math
 import random as rnd
+import time
+from itertools import cycle
 
 WIDTH, HEIGHT = 1200, 800  # Размеры игрового окна
 WIDTH_ZONE, HEIGHT_ZONE = 3000, 3000  # Размеры игрового поля
@@ -74,6 +76,11 @@ class Game:
                         pygame.quit()
                         quit()
                 if event.type == pygame.QUIT:
+                    self.is_running = False
+                    pygame.quit()
+                    quit()
+                if bacterium.mass > WIDTH_ZONE - 100 or bacterium.mass <= 1:
+                    bacterium.mass = WIDTH_ZONE
                     self.is_running = False
                     pygame.quit()
                     quit()
@@ -202,18 +209,43 @@ class CellList(CanPaint):
         super().__init__(surface, cam)
         self.cell_list = []
         for _ in range(num):
-            cell = Cell(self.surface, self.camera)
+            cell = self.choice_color()
             self.cell_list.append(cell)
 
     def new_cell(self, num=1):
         # Добавляет новую клетку
         for _ in range(num):
-            self.cell_list.append(Cell(self.surface, self.camera))
+            self.cell_list.append(rnd.choice(
+                [
+                    GreenCell,
+                    RedCell,
+                    PurpleCell,
+                    WhiteCell,
+                    RainbowCell,
+                    PinkCell
+                ])(self.surface, self.camera))
 
     def draw(self):
         # Рисует все клетки
         for cell in self.cell_list:
             cell.draw()
+
+    @staticmethod
+    def choice_color():
+        # С разной вероятностью возвращает один из классов клетки
+
+        chance = rnd.randint(1, 100)
+
+        if chance <= 70:
+            return GreenCell(screen, camera)
+        elif 71 <= chance <= 85:
+            return RedCell(screen, camera)
+        elif 86 <= chance <= 90:
+            return PinkCell(screen, camera)
+        elif 91 <= chance <= 95:
+            return WhiteCell(screen, camera)
+        elif 96 <= chance <= 100:
+            return RainbowCell(screen, camera)
 
 
 class Cell(CanPaint):
@@ -245,9 +277,100 @@ class Cell(CanPaint):
         place_spawn = (int(self.x * zoom + x), int(self.y * zoom + y))
         pygame.draw.circle(self.surface, self.color, place_spawn, int(self.mass * zoom))
 
+    def __call__(self, player):
+        # Затычка для функции
+        pass
+
+
+class GreenCell(Cell):
+    # Класс зелёной клетки, которая увеличивает массу на 1
+
+    def __init__(self, surface, cam):
+        super().__init__(surface, cam)
+        self.color = (0, 255, 0)
+
     def __call__(self, player: Player):
         # Увеличивает массу на 1
         bacterium.mass += 1
+
+
+class RedCell(Cell):
+    # Класс красной клетки, которая уменьшает массу на 15
+
+    def __init__(self, surface, cam):
+        super().__init__(surface, cam)
+        self.color = (255, 0, 0)
+
+    def __call__(self, player: Player):
+        # Уменьшает массу на 15
+        bacterium.mass -= 15
+
+
+class PurpleCell(Cell):
+    # Класс фиолетовой клетки, которая останавливает время на 2 секунды
+
+    def __init__(self, surface, cam):
+        super().__init__(surface, cam)
+        self.color = (139, 0, 255)
+
+    def __call__(self, player: Player):
+        # Останавливает игру
+        time.sleep(2)
+
+
+class WhiteCell(Cell):
+    # Класс белой клетки, которая лопает игрока
+
+    def __init__(self, surface, cam):
+        super().__init__(surface, cam)
+        self.color = (255, 255, 255)
+
+    def __call__(self, player: Player):
+        # Изменяет массу на 1 из-за чего игра заканчивается
+        bacterium.mass = 1
+
+
+class RainbowCell(Cell):
+    # Класс переливающейся клетки, которая увеличивает массу на 20
+
+    def __init__(self, surface, cam):
+        super().__init__(surface, cam)
+        colors = [
+            [242, 242, 101], [242, 242, 101], [242, 242, 101], [242, 242, 101], [242, 242, 101], [242, 242, 101],
+            [141, 6, 191], [141, 6, 191], [141, 6, 191], [141, 6, 191], [141, 6, 191], [141, 6, 191],
+            [141, 66, 212], [141, 66, 212], [141, 66, 212], [141, 66, 212], [141, 66, 212], [141, 66, 212],
+            [232, 22, 88], [232, 22, 88], [232, 22, 88], [232, 22, 88], [232, 22, 88], [232, 22, 88],
+            [242, 232, 33], [242, 232, 33], [242, 232, 33], [242, 232, 33], [242, 232, 33], [242, 232, 33],
+            [212, 55, 121], [212, 55, 121], [212, 55, 121], [212, 55, 121], [212, 55, 121], [212, 55, 121],
+            [22, 212, 11], [22, 212, 11], [22, 212, 11], [22, 212, 11], [22, 212, 11], [22, 212, 11],
+            [22, 232, 55], [22, 232, 55], [22, 232, 55], [22, 232, 55], [22, 232, 55], [22, 232, 55],
+            [202, 101, 252], [202, 101, 252], [202, 101, 252], [202, 101, 252], [202, 101, 252], [202, 101, 252],
+            [242, 151, 33], [242, 151, 33], [242, 151, 33], [242, 151, 33], [242, 151, 33], [242, 151, 33],
+        ]
+        self.colors = cycle(colors)
+        self.color = next(self.colors)
+
+    def draw(self):
+        # Рисует клетку на поле
+        super().draw()
+        self.color = next(self.colors)
+
+    def __call__(self, player: Player):
+        # Увеличивает массу на 20
+        bacterium.mass += 20
+
+
+class PinkCell(Cell):
+    # Класс зелёной клетки, которая имеет функцию одной из других клеток
+
+    def __init__(self, surface, cam):
+        super().__init__(surface, cam)
+        self.color = (255, 155, 170)
+        self.do = CellList.choice_color()
+
+    def __call__(self, player: Player):
+        # Выполняет функцию клетки
+        self.do(player)
 
 
 if __name__ == '__main__':
