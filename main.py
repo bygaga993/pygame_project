@@ -3,8 +3,8 @@ import math
 import random as rnd
 
 WIDTH, HEIGHT = 1200, 800  # Размеры игрового окна
-WIDTH_ZONE, HEIGHT_ZONE = 1200, 800  # Размеры игрового поля
-FPS = 60  # Количествo кадров в секунду
+WIDTH_ZONE, HEIGHT_ZONE = 3000, 3000  # Размеры игрового поля
+FPS = 60  # Количество кадров в секунду
 
 # Инициализирование pygame
 pygame.init()
@@ -12,6 +12,11 @@ screen = pygame.display.set_mode((WIDTH, HEIGHT))
 screen.fill((0, 0, 0))
 pygame.display.set_caption("My Game")
 clock = pygame.time.Clock()
+
+# Шрифт текста
+type_font = 'Verdana.ttf'
+font = pygame.font.SysFont(type_font, 24, True)
+big_font = pygame.font.SysFont(type_font, 28, True)
 
 
 class Painter:
@@ -39,15 +44,26 @@ class Game:
         self.is_running = False
         self.pause_menu = False
 
+    @classmethod
+    def get_distance(cls, bac1, bac2):
+        # Возвращает дистанцию между двумя точками
+        dist_x = abs(bac1[0] - bac2[0])
+        dist_y = abs(bac1[1] - bac2[1])
+        return (dist_x ** 2 + dist_y ** 2) ** 0.5
+
+    @classmethod
+    def drawtext(cls, message, pos, color=(255, 255, 255)):
+        # Выводит текст заданного цвета
+        screen.blit(font.render(message, True, color), pos)
+
     def start(self):
         # Запускает игру
-
-        global camera
+        global camera, game
         self.is_running = True
         painter = Painter()
         painter.add(grid)
+        painter.add(cells)
         painter.add(bacterium)
-
         while self.is_running:
             clock.tick(FPS)
             events = pygame.event.get()
@@ -63,7 +79,7 @@ class Game:
                     quit()
 
             bacterium.move()
-
+            bacterium.collision_check(cells.cell_list)
             if camera is not None:
                 camera.update(bacterium)
 
@@ -134,6 +150,14 @@ class Player(CanPaint):
         self.outline_color = "#007a3f"
         self.poison = False
 
+    def collision_check(self, foods):
+        # Проверяет все клетки, если игрок может съесть клетку, то удаляет её и у клетки вызывает метод действия.
+        for food in foods:
+            if Game().get_distance([food.x, food.y], [self.x, self.y]) <= self.mass / 2:
+                food(self)
+                foods.remove(food)
+                cells.new_cell(rnd.choice([1, 0, 1]))
+
     def move(self):
         # Движение игрока
         self.outline_size = 3 + self.mass / 2
@@ -171,9 +195,65 @@ class Player(CanPaint):
         pygame.draw.circle(self.surface, self.color, center, int(self.mass / 2 * zoom))
 
 
+class CellList(CanPaint):
+    # Класс группы всех клеток
+
+    def __init__(self, surface, cam, num):
+        super().__init__(surface, cam)
+        self.cell_list = []
+        for _ in range(num):
+            cell = Cell(self.surface, self.camera)
+            self.cell_list.append(cell)
+
+    def new_cell(self, num=1):
+        # Добавляет новую клетку
+        for _ in range(num):
+            self.cell_list.append(Cell(self.surface, self.camera))
+
+    def draw(self):
+        # Рисует все клетки
+        for cell in self.cell_list:
+            cell.draw()
+
+
+class Cell(CanPaint):
+    # Класс обычной клетки без функции
+
+    def __init__(self, surface, cam):
+        super().__init__(surface, cam)
+        self.mass = 10
+        self.x, self.y = rnd.randint(11, WIDTH_ZONE - 11), rnd.randint(11, WIDTH_ZONE - 11)
+        colors_cells = [
+            [242, 242, 101],
+            [141, 6, 191],
+            [141, 66, 212],
+            [232, 22, 88],
+            [242, 232, 33],
+            [212, 55, 121],
+            [22, 212, 11],
+            [22, 232, 55],
+            [202, 101, 252],
+            [242, 151, 33]
+        ]
+        self.color = rnd.choice(colors_cells)
+        self.do = rnd.choice([1, 2, 3])
+
+    def draw(self):
+        # Рисует клетку на поле
+        zoom = self.camera.zoom
+        x, y = self.camera.x, self.camera.y
+        place_spawn = (int(self.x * zoom + x), int(self.y * zoom + y))
+        pygame.draw.circle(self.surface, self.color, place_spawn, int(self.mass * zoom))
+
+    def __call__(self, player: Player):
+        # Увеличивает массу на 1
+        bacterium.mass += 1
+
+
 if __name__ == '__main__':
     camera = Camera()
     grid = Grid(screen, camera)
+    cells = CellList(screen, camera, 700)
     bacterium = Player(screen, camera)
     game = Game()
     game.start()
