@@ -24,6 +24,14 @@ type_font = 'Verdana.ttf'
 font = pygame.font.SysFont(type_font, 24, True)
 big_font = pygame.font.SysFont(type_font, 28, True)
 
+# Загрузка музыки
+pygame.mixer.music.load("data/Lines of Code.mp3")
+menu_sound = pygame.mixer.music
+eat_sound = pygame.mixer.Sound("data/eat_sound.wav")
+click = pygame.mixer.Sound("data/click.wav")
+eat_sound.set_volume(level_volume)
+click.set_volume(level_volume)
+
 
 class Painter:
     # Класс, который объединяет все объекты и отрисовывает их
@@ -72,8 +80,6 @@ class MainMenu(pygame_menu.Menu):
         # Добавление пункта настроек
         self.settings = pygame_menu.Menu('Settings :', WIDTH, HEIGHT, theme=pygame_menu.themes.THEME_DARK)
 
-        # self.settings.add.progress_bar('Volume :', level_volume * 100, onchange=Game.set_volume_music)
-
     @classmethod
     def start_the_game(cls):
         # Закрывает главное меню и начинает игру
@@ -90,6 +96,8 @@ class MainMenu(pygame_menu.Menu):
         bacterium = Player(screen, camera)
 
         mainmenu = MainMenu()
+        menu_sound.play(-1)
+        menu_sound.set_volume(level_volume)
 
         while True:
             events = pygame.event.get()
@@ -109,10 +117,12 @@ class MainMenu(pygame_menu.Menu):
 
     def settings_menu(self):
         # Открывает меню настроек
+        click.play()
         self._open(self.settings)
 
     def manual_menu(self):
         # Отрывает меню инструкции
+        click.play()
         self._open(self.manual)
 
 
@@ -132,12 +142,14 @@ class Game:
     def set_name(cls, value):
         # Меняет имя игрока
         global name
+        click.play()
         name = value
 
     @classmethod
     def set_volume_music(cls, value):
         # Меняет громкость игры
         global level_volume
+        click.play()
         level_volume = value
         return level_volume
 
@@ -156,11 +168,13 @@ class Game:
     def start(self):
         # Запускает игру
         global camera
+        click.play()
         self.is_running = True
         painter = Painter()
         painter.add(grid)
         painter.add(cells)
         painter.add(bacterium)
+        menu_sound.pause()
         while self.is_running:
             clock.tick(FPS)
             events = pygame.event.get()
@@ -256,6 +270,7 @@ class Player(CanPaint):
         # Проверяет все клетки, если игрок может съесть клетку, то удаляет её и у клетки вызывает метод действия.
         for food in foods:
             if Game().get_distance([food.x, food.y], [self.x, self.y]) <= self.mass / 2:
+                eat_sound.play()
                 food(self)
                 foods.remove(food)
                 cells.new_cell(rnd.choice([1, 0, 1]))
