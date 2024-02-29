@@ -21,8 +21,16 @@ level_volume = 0.05  # Громкость игры
 
 # Задание шрифта текста
 type_font = 'Verdana.ttf'
-font = pygame.font.SysFont(type_font, 24, True)
-big_font = pygame.font.SysFont(type_font, 28, True)
+font = pygame.font.SysFont(type_font, 27, True)
+big_font = pygame.font.SysFont(type_font, 40, True)
+
+# Загрузка музыки
+pygame.mixer.music.load("data/Lines of Code.mp3")
+menu_sound = pygame.mixer.music
+eat_sound = pygame.mixer.Sound("data/eat_sound.wav")
+click = pygame.mixer.Sound("data/click.wav")
+eat_sound.set_volume(level_volume)
+click.set_volume(level_volume)
 
 
 class Painter:
@@ -54,6 +62,7 @@ class MainMenu(pygame_menu.Menu):
         self.add.button('Играть', self.start_the_game)
         self.add.button('Инструкция', self.manual_menu)
         # self.add.button('Настройки', self.settings_menu)
+        self.add.button('Статистика', self.statistic_menu)
         self.add.button('Выйти', pygame_menu.events.EXIT)
 
         # Добавление пункта инструкции
@@ -71,7 +80,8 @@ class MainMenu(pygame_menu.Menu):
 
         # Добавление пункта настроек
         self.settings = pygame_menu.Menu('Settings :', WIDTH, HEIGHT, theme=pygame_menu.themes.THEME_DARK)
-
+        self.statistic = pygame_menu.Menu('Statistic :', WIDTH, HEIGHT, theme=pygame_menu.themes.THEME_DARK)
+        self.statistic.add.label(statistic.last_games_out)
         # self.settings.add.progress_bar('Volume :', level_volume * 100, onchange=Game.set_volume_music)
 
     @classmethod
@@ -83,13 +93,16 @@ class MainMenu(pygame_menu.Menu):
     @classmethod
     def start(cls):
         # Запускает главное меню
-        global camera, grid, cells, bacterium
+        global camera, grid, cells, bacterium, statistic
         camera = Camera()
         grid = Grid(screen, camera)
         cells = CellList(screen, camera, 1000)
         bacterium = Player(screen, camera)
 
+        statistic.read_file()
         mainmenu = MainMenu()
+        menu_sound.play(-1)
+        menu_sound.set_volume(level_volume)
 
         while True:
             events = pygame.event.get()
@@ -109,10 +122,17 @@ class MainMenu(pygame_menu.Menu):
 
     def settings_menu(self):
         # Открывает меню настроек
+        click.play()
         self._open(self.settings)
+
+    def statistic_menu(self):
+        # Открывает меню статистики игрока
+        click.play()
+        self._open(self.statistic)
 
     def manual_menu(self):
         # Отрывает меню инструкции
+        click.play()
         self._open(self.manual)
 
 
@@ -132,12 +152,14 @@ class Game:
     def set_name(cls, value):
         # Меняет имя игрока
         global name
+        click.play()
         name = value
 
     @classmethod
     def set_volume_music(cls, value):
         # Меняет громкость игры
         global level_volume
+        click.play()
         level_volume = value
         return level_volume
 
@@ -156,11 +178,14 @@ class Game:
     def start(self):
         # Запускает игру
         global camera
+        click.play()
         self.is_running = True
         painter = Painter()
         painter.add(grid)
         painter.add(cells)
         painter.add(bacterium)
+        painter.add(statistic)
+        menu_sound.pause()
         while self.is_running:
             clock.tick(FPS)
             events = pygame.event.get()
@@ -168,15 +193,22 @@ class Game:
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
                         self.is_running = False
+                        statistic.update()
+                        statistic.write_file()
                         pygame.quit()
                         quit()
                 if event.type == pygame.QUIT:
                     self.is_running = False
+                    statistic.update()
+                    statistic.write_file()
                     pygame.quit()
                     quit()
                 if bacterium.mass > WIDTH_ZONE - 100 or bacterium.mass <= 1:
                     bacterium.mass = WIDTH_ZONE
                     self.is_running = False
+                    statistic.update()
+                    statistic.write_file()
+
                     MainMenu.start()
 
             bacterium.move()
@@ -238,6 +270,56 @@ class Grid(CanPaint):
             pygame.draw.line(self.surface, self.color_grid, (x + i * zoom, y), (i * zoom + x, WIDTH_ZONE * zoom + y), 3)
 
 
+class Statistic(CanPaint):
+    # Класс статистики игрока
+    def __init__(self, surface, cam):
+        super().__init__(surface, cam)
+        self.color_statistic = "#78c77b"
+        self.best_result = "0"
+        self.last_games = ["0"] * 10
+        self.last_games_out = "Сейчас статистики нет. Сыграйте игру для появления."
+
+    def draw(self):
+        # Выводит статистику
+        x, y = self.camera.x, self.camera.y
+
+        Game().drawtext("Лучший результат", (x + 100, y + 100), Player.FONT_COLOR)
+        Game().drawtext(self.best_result, (x + 100, y + 130), Player.FONT_COLOR)
+
+    def read_file(self):
+        # Считывает файл со статистикой
+        try:
+            with open("data/statistic.txt", "r", encoding="utf-8") as file_stat:
+                info = file_stat.readlines()
+                if info:
+                    self.best_result = info[0].strip()
+                    if len(info) == 11:
+                        self.last_games = [i.strip() for i in info[1:11]]
+        except IOError:
+            print("Ошибка файла статистики")
+
+    def write_file(self):
+        # Записывает файл со статистикой
+        try:
+            with open("data/statistic.txt", "w", encoding="utf-8") as file_stat:
+                file_stat.write(self.best_result + "\n")
+                for i in self.last_games:
+                    file_stat.write(i + "\n")
+                file_stat.close()
+        except IOError:
+            print("Ошибка файла статистики")
+
+    def update(self):
+        # Обновление лучшего результата и списка послед
+        self.best_result = str(max(int(self.best_result), bacterium.max_mass))
+        for i, num in enumerate(self.last_games[1:]):
+            self.last_games[9 - i] = self.last_games[8 - i]
+        self.last_games[0] = str(bacterium.max_mass)
+        self.last_games_out = "Последние 10 игр:\n"
+        for i, num in enumerate(self.last_games):
+            self.last_games_out += f"{i + 1}. {num}\n"
+
+
 class Player(CanPaint):
     # Класс игрока
 
@@ -246,22 +328,27 @@ class Player(CanPaint):
     def __init__(self, surface, cam):
         super().__init__(surface, cam)
         self.x, self.y = rnd.randint(300, WIDTH_ZONE - 300), rnd.randint(300, WIDTH_ZONE - 300)
-        self.mass, self.speed = 20, 4
+        self.mass, self.speed = 20, 2
         self.outline_size = 3 + self.mass / 2
         self.color = "#00c77b"
         self.outline_color = "#007a3f"
         self.poison = False
+        self.max_mass = 20
 
     def collision_check(self, foods):
         # Проверяет все клетки, если игрок может съесть клетку, то удаляет её и у клетки вызывает метод действия.
+
         for food in foods:
             if Game().get_distance([food.x, food.y], [self.x, self.y]) <= self.mass / 2:
+                eat_sound.play()
                 food(self)
+                self.max_mass = max(self.max_mass, self.mass)
                 foods.remove(food)
                 cells.new_cell(rnd.choice([1, 0, 1]))
 
     def move(self):
         # Движение игрока
+
         self.outline_size = 3 + self.mass / 2
         go_x, go_y = pygame.mouse.get_pos()
         rotation = math.atan2(go_y - float(HEIGHT) / 2, go_x - float(WIDTH) / 2)
@@ -479,5 +566,6 @@ if __name__ == '__main__':
     grid = Grid(screen, camera)
     cells = CellList(screen, camera, 1000)
     bacterium = Player(screen, camera)
+    statistic = Statistic(screen, camera)
 
     MainMenu.start()
