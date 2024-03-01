@@ -33,6 +33,10 @@ eat_sound = pygame.mixer.Sound("data/eat_sound.wav")
 click = pygame.mixer.Sound("data/click.wav")
 eat_sound.set_volume(level_volume)
 click.set_volume(level_volume)
+fail_sound = pygame.mixer.Sound("data/fail.mp3")
+fail_sound.set_volume(level_volume)
+win_sound = pygame.mixer.Sound("data/win.mp3")
+win_sound.set_volume(level_volume * 3)
 
 
 def load_image(name, colorkey=None):
@@ -233,9 +237,11 @@ class Game:
     @classmethod
     def stop_game(cls):
         if bacterium.max_mass <= int(statistic.best_result):
-            screensaver("win_screen.jpg", False)
+            fail_sound.play()
+            screensaver("screensaver.jpg", False)
         else:
-            screensaver("win_screen.jpg", True)
+            win_sound.play()
+            screensaver("screensaver.jpg", True)
         statistic.update()
         statistic.write_file()
 
@@ -267,7 +273,7 @@ class Game:
                     pygame.quit()
                     quit()
                 if bacterium.mass > WIDTH_ZONE - 100:
-                    Game().stop_game()
+                    self.stop_game()
 
             bacterium.move()
             bacterium.collision_check(cells.cell_list)
